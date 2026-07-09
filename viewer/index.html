@@ -54,6 +54,13 @@
         <div><span>voltage</span><strong id="voltage-value">0.000</strong></div>
         <div><span>weight</span><strong id="learning-value">-</strong></div>
       </section>
+      <section id="hpc-panel" aria-label="Scale view">
+        <h2>Scale</h2>
+        <div class="scale-row"><span>mode</span><select id="scale-mode"><option value="sampled">sampled</option><option value="aggregate">aggregate</option></select></div>
+        <div class="scale-row"><span>events/step</span><strong id="events-step-value">0</strong></div>
+        <div class="scale-row"><span>active</span><strong id="active-ratio-value">0%</strong></div>
+        <canvas id="raster-canvas" width="280" height="96" aria-label="Spike raster"></canvas>
+      </section>
       <section id="stimulus-panel" aria-label="Stimulus">
         <h2>Stimulus</h2>
         <div class="stimulus-row">

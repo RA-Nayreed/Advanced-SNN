@@ -81,7 +81,7 @@ cd viewer
 python3 -m http.server 5173
 ```
 
-Then open `http://127.0.0.1:5173`. The viewer can also apply offline region stimulation overlays.
+Then open `http://127.0.0.1:5173`. The viewer can also apply offline region stimulation overlays. HPC-scale viewing keeps individual rendering sampled while showing aggregate region activity, a spike raster, and throughput counters.
 
 Live local viewer backend:
 

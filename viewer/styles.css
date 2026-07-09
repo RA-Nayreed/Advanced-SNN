@@ -170,6 +170,58 @@ input {
   text-overflow: ellipsis;
 }
 
+#hpc-panel {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(177, 194, 224, 0.14);
+  border-radius: 8px;
+  background: #151a23;
+}
+
+#hpc-panel h2 {
+  margin: 0;
+  color: #dfe9fb;
+  font-size: 14px;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.scale-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.scale-row span {
+  color: #96a4ba;
+  font-size: 12px;
+}
+
+.scale-row strong,
+.scale-row select {
+  min-width: 0;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 580;
+}
+
+.scale-row select {
+  height: 30px;
+  border: 1px solid rgba(180, 198, 224, 0.25);
+  border-radius: 6px;
+  background: #10151f;
+}
+
+#raster-canvas {
+  width: 100%;
+  height: 96px;
+  border: 1px solid rgba(177, 194, 224, 0.12);
+  border-radius: 6px;
+  background: #090c12;
+}
+
 #stimulus-panel {
   display: grid;
   gap: 9px;
@@ -221,7 +273,7 @@ input {
 
 .region-row {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto;
+  grid-template-columns: 14px minmax(0, 1fr) 48px;
   gap: 9px;
   align-items: center;
   padding: 8px 0;
@@ -253,6 +305,12 @@ input {
   color: #aebbd1;
   font-size: 12px;
   font-weight: 520;
+}
+
+.region-row meter {
+  width: 48px;
+  height: 8px;
+  accent-color: #75d6ff;
 }
 
 #selected-neuron {

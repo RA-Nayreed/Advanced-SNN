@@ -26,3 +26,7 @@ python3 tools/live_brain_server.py --port 5173
 ```
 
 Open `http://127.0.0.1:5173` and press `LIVE`.
+
+## Scale view
+
+Use `sampled` mode for individual neuron inspection and `aggregate` mode for large runs where the sampled graph is a proxy for HPC-scale region activity. The raster panel shows recent regional spike density.

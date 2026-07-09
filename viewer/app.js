@@ -118,6 +118,10 @@ const els = {
   selectedVoltage: document.querySelector('#selected-voltage'),
   stimTarget: document.querySelector('#stim-target'),
   stimGain: document.querySelector('#stim-gain'),
+  scaleMode: document.querySelector('#scale-mode'),
+  eventsStep: document.querySelector('#events-step-value'),
+  activeRatio: document.querySelector('#active-ratio-value'),
+  raster: document.querySelector('#raster-canvas'),
 };
 
 let frames = [];
@@ -316,7 +320,81 @@ function applyFrame(frame) {
   els.learningValue.textContent = frame.metrics?.mean_abs_weight == null
     ? '-'
     : Number(frame.metrics.mean_abs_weight).toFixed(3);
+  updateScaleMetrics(frame);
   updateSelectedNeuron(frame);
+}
+
+function updateScaleMetrics(frame) {
+  const active = Number(frame.metrics?.active_output_spikes ?? 0);
+  const total = Number(frame.neurons_total ?? frame.neurons.length || 1);
+  const events = Number(frame.metrics?.synapse_events_processed ?? 0);
+  const previous = frames[Math.max(0, frameIndex - 1)];
+  const previousEvents = Number(previous?.metrics?.synapse_events_processed ?? 0);
+  els.eventsStep.textContent = String(Math.max(0, events - previousEvents));
+  els.activeRatio.textContent = `${((active / Math.max(1, total)) * 100).toFixed(2)}%`;
+
+  if (els.scaleMode.value === 'aggregate') {
+    synapseMaterial.opacity = 0.08;
+    neuronsMesh.material.emissiveIntensity = 0.38;
+  } else {
+    synapseMaterial.opacity = 0.22;
+    neuronsMesh.material.emissiveIntensity = 1.0;
+  }
+
+  drawRaster();
+  updateRegionMeters(frame);
+}
+
+function updateRegionMeters(frame) {
+  for (const meter of els.regions.querySelectorAll('meter[data-region-id]')) {
+    meter.value = String(regionActivity(frame, Number(meter.dataset.regionId)));
+  }
+}
+
+function drawRaster() {
+  const ctx = els.raster.getContext('2d');
+  const width = els.raster.width;
+  const height = els.raster.height;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#090c12';
+  ctx.fillRect(0, 0, width, height);
+
+  const visible = frames.slice(Math.max(0, frameIndex - 96), frameIndex + 1);
+  const regionCount = Math.max(1, regionsById.size || 1);
+  const columnWidth = width / Math.max(1, visible.length);
+  const rowHeight = height / regionCount;
+
+  visible.forEach((frame, column) => {
+    const counts = new Array(regionCount).fill(0);
+    const totals = new Array(regionCount).fill(0);
+    for (const neuron of frame.neurons || []) {
+      const region = Math.min(regionCount - 1, Number(neuron.region_id || 0));
+      totals[region] += 1;
+      if (neuron.spiked) {
+        counts[region] += 1;
+      }
+    }
+    counts.forEach((count, region) => {
+      const ratio = totals[region] ? count / totals[region] : 0;
+      ctx.fillStyle = `rgba(117, 214, 255, ${Math.min(1, 0.16 + ratio * 7)})`;
+      ctx.fillRect(column * columnWidth, region * rowHeight, Math.max(1, columnWidth), Math.max(1, rowHeight - 1));
+    });
+  });
+}
+
+function regionActivity(frame, regionId) {
+  let total = 0;
+  let active = 0;
+  for (const neuron of frame.neurons || []) {
+    if (neuron.region_id !== regionId) {
+      continue;
+    }
+    total += 1;
+    if (neuron.spiked) {
+      active += 1;
+    }
+  }
+  return total === 0 ? 0 : active / total;
 }
 
 function updateSelectedNeuron(frame) {
@@ -410,8 +488,11 @@ function renderRegions(regions) {
     swatch.style.background = `rgb(${Math.round(color[0] * 255)}, ${Math.round(color[1] * 255)}, ${Math.round(color[2] * 255)})`;
     const name = document.createElement('span');
     name.textContent = region.name || `region ${region.id}`;
-    const radius = document.createElement('strong');
-    radius.textContent = Number(region.radius || 0).toFixed(2);
+    const radius = document.createElement('meter');
+    radius.min = '0';
+    radius.max = '1';
+    radius.dataset.regionId = String(region.id);
+    radius.value = String(regionActivity(frames[frameIndex] || { neurons: [] }, region.id));
     row.addEventListener('click', () => {
       stimulatedRegionId = stimulatedRegionId === region.id ? null : region.id;
       renderRegions(regions);
@@ -512,6 +593,7 @@ els.stepBack.addEventListener('click', () => selectFrame(frameIndex - 1));
 els.stepForward.addEventListener('click', () => selectFrame(frameIndex + 1));
 els.slider.addEventListener('input', () => selectFrame(Number(els.slider.value)));
 els.stimGain.addEventListener('input', () => frames.length && applyFrame(frames[frameIndex]));
+els.scaleMode.addEventListener('change', () => frames.length && applyFrame(frames[frameIndex]));
 canvas.addEventListener('pointerdown', pickNeuron);
 
 loadSnapshotText(`
