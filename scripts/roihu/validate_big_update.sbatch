@@ -98,21 +98,28 @@ cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
   2>&1 | tee "${OUT_DIR}/brain_learning.log"
 
 if mpi_build_available; then
-  cargo build --release --features mpi 2>&1 | tee "${OUT_DIR}/build_mpi.log"
-  if command -v srun >/dev/null 2>&1; then
-    srun --ntasks=1 ./target/release/advanced-snn distributed-cpu \
-      --neurons 20000 \
-      --fanout 64 \
-      --steps 10 \
-      --seed 7 \
-      2>&1 | tee "${OUT_DIR}/distributed_probe.log"
+  if cargo build --release --features mpi 2>&1 | tee "${OUT_DIR}/build_mpi.log"; then
+    if command -v srun >/dev/null 2>&1; then
+      srun --ntasks=1 ./target/release/advanced-snn distributed-cpu \
+        --neurons 20000 \
+        --fanout 64 \
+        --steps 10 \
+        --seed 7 \
+        2>&1 | tee "${OUT_DIR}/distributed_probe.log"
+    else
+      mpirun -np 1 ./target/release/advanced-snn distributed-cpu \
+        --neurons 20000 \
+        --fanout 64 \
+        --steps 10 \
+        --seed 7 \
+        2>&1 | tee "${OUT_DIR}/distributed_probe.log"
+    fi
   else
-    mpirun -np 1 ./target/release/advanced-snn distributed-cpu \
-      --neurons 20000 \
-      --fanout 64 \
-      --steps 10 \
-      --seed 7 \
-      2>&1 | tee "${OUT_DIR}/distributed_probe.log"
+    {
+      echo "MPI feature build failed; distributed probe skipped."
+      echo "See ${OUT_DIR}/build_mpi.log."
+      echo "Common cause: bindgen requires libclang; load a Roihu LLVM/Clang module or set LIBCLANG_PATH."
+    } | tee "${OUT_DIR}/distributed_probe.log"
   fi
 else
   {
