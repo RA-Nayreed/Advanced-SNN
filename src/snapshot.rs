@@ -125,6 +125,9 @@ pub struct SnapshotMetrics {
     pub active_output_spikes: usize,
     pub synapse_events_processed: u64,
     pub mean_sample_voltage: f32,
+    pub stdp_potentiated: Option<u64>,
+    pub stdp_depressed: Option<u64>,
+    pub mean_abs_weight: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -225,6 +228,9 @@ impl SnapshotWriter {
                 active_output_spikes: trace.output_spikes.len(),
                 synapse_events_processed: trace.synapse_events_processed,
                 mean_sample_voltage,
+                stdp_potentiated: None,
+                stdp_depressed: None,
+                mean_abs_weight: None,
             },
         };
 

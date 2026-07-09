@@ -4,6 +4,7 @@ pub mod config;
 pub mod cpu;
 pub mod gpu;
 pub mod graph;
+pub mod learning;
 pub mod metrics;
 pub mod neuron;
 pub mod snapshot;

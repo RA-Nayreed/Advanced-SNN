@@ -1,0 +1,15 @@
+backend = "learn"
+neurons = 2000
+fanout = 32
+steps = 300
+seed = 7
+decay = 0.95
+threshold = 1.0
+reset = 0.0
+refractory = 0
+external_prob = 0.006
+external_current = 1.2
+snapshot_every = 2
+snapshot_neurons = 1500
+snapshot_synapses = 4000
+stdp = true

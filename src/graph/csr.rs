@@ -47,6 +47,10 @@ impl CsrGraph {
         &self.weights
     }
 
+    pub fn weights_mut(&mut self) -> &mut [f32] {
+        &mut self.weights
+    }
+
     pub fn outgoing_range(&self, neuron_id: usize) -> Range<usize> {
         let start = self.row_ptr[neuron_id] as usize;
         let end = self.row_ptr[neuron_id + 1] as usize;

@@ -8,6 +8,7 @@ use crate::config::{DenseSimulationConfig, SimulationConfig};
 use crate::cpu::reference::run_reference;
 use crate::gpu;
 use crate::graph::random::generate_random_graph;
+use crate::learning::{run_stdp_learning, StdpConfig};
 use crate::neuron::lif::LifParams;
 use crate::snapshot::{run_reference_with_snapshots, SnapshotOptions};
 
@@ -23,6 +24,7 @@ pub struct Cli {
 enum Command {
     Cpu(CpuArgs),
     Brain(CpuArgs),
+    Learn(CpuArgs),
     GpuDense(DenseArgs),
     GpuEvent(GraphArgs),
 
@@ -99,6 +101,7 @@ pub fn run() -> Result<()> {
     match cli.command {
         Command::Cpu(args) => run_cpu(args),
         Command::Brain(args) => run_brain(args),
+        Command::Learn(args) => run_learn(args),
         Command::GpuDense(args) => run_gpu_dense(args),
         Command::GpuEvent(args) => run_gpu_event(args),
 
@@ -139,6 +142,30 @@ fn run_brain(args: CpuArgs) -> Result<()> {
         run_reference(&config, &brain.graph)?
     };
     print!("{}", result.metrics);
+    Ok(())
+}
+
+fn run_learn(args: CpuArgs) -> Result<()> {
+    let config = args.graph.to_simulation_config();
+    config.validate()?;
+    let mut brain = generate_brain_blob(&BrainBlobConfig::new(
+        config.neurons,
+        config.fanout,
+        config.seed,
+    ))?;
+    let layout = brain.snapshot_layout();
+    let snapshots = args
+        .snapshot
+        .to_options()
+        .map(|options| options.with_layout(layout.clone()));
+    let result = run_stdp_learning(
+        &config,
+        &mut brain.graph,
+        layout,
+        StdpConfig::default(),
+        snapshots,
+    )?;
+    print!("{result}");
     Ok(())
 }
 

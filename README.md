@@ -53,6 +53,14 @@ cargo run --release -- brain --neurons 2000 --fanout 32 --steps 200 --seed 7 \
   --snapshot-out brain_blob.ndjson --snapshot-every 2 --snapshot-neurons 1500 --snapshot-synapses 4000
 ```
 
+Learning brain mode:
+
+```bash
+cargo run --release -- learn --neurons 2000 --fanout 32 --steps 300 --seed 7 \
+  --external-prob 0.006 --external-current 1.2 \
+  --snapshot-out brain_learning.ndjson --snapshot-every 2 --snapshot-neurons 1500 --snapshot-synapses 4000
+```
+
 Script wrappers are available under `scripts/`.
 
 CPU snapshot export for visualization:
@@ -66,7 +74,7 @@ Snapshots are written as newline-delimited JSON. Each line contains sampled neur
 
 ## Viewer
 
-A static Three.js snapshot viewer lives in `viewer/`. Serve it locally and load `.ndjson` snapshots from the `brain` or `cpu` commands:
+A static Three.js snapshot viewer lives in `viewer/`. Serve it locally and load `.ndjson` snapshots from the `brain`, `learn`, or `cpu` commands:
 
 ```bash
 cd viewer
@@ -112,7 +120,7 @@ If CUDA is unavailable, GPU tests skip after receiving the CUDA-unavailable erro
 - no MPI yet
 - no multi-GPU execution yet
 - no synaptic delays yet
-- no STDP or other plasticity yet
+- STDP is currently CPU-only and intended for visual/experimental runs
 - event backend uses `atomicAdd`
 - graph storage is explicit in memory
 
@@ -121,5 +129,5 @@ If CUDA is unavailable, GPU tests skip after receiving the CUDA-unavailable erro
 - MPI rank per GPU
 - distributed sparse spike and event exchange
 - delay queues
-- STDP
+- richer plasticity rules and GPU learning kernels
 - profiling and scaling studies

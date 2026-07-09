@@ -108,6 +108,7 @@ const els = {
   synapses: document.querySelector('#synapses-value'),
   active: document.querySelector('#active-value'),
   voltage: document.querySelector('#voltage-value'),
+  learningValue: document.querySelector('#learning-value'),
   regions: document.querySelector('#region-list'),
   status: document.querySelector('#status-line'),
   selectedId: document.querySelector('#selected-id'),
@@ -230,6 +231,9 @@ function applyFrame(frame) {
   els.synapses.textContent = String(frame.synapses_total ?? (frame.synapses || []).length);
   els.active.textContent = String(frame.metrics?.active_output_spikes ?? 0);
   els.voltage.textContent = Number(frame.metrics?.mean_sample_voltage ?? 0).toFixed(3);
+  els.learningValue.textContent = frame.metrics?.mean_abs_weight == null
+    ? '-'
+    : Number(frame.metrics.mean_abs_weight).toFixed(3);
   updateSelectedNeuron(frame);
 }
 
