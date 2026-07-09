@@ -115,6 +115,8 @@ const els = {
   selectedKind: document.querySelector('#selected-kind'),
   selectedRegion: document.querySelector('#selected-region'),
   selectedVoltage: document.querySelector('#selected-voltage'),
+  stimTarget: document.querySelector('#stim-target'),
+  stimGain: document.querySelector('#stim-gain'),
 };
 
 let frames = [];
@@ -125,6 +127,7 @@ let neuronIdToIndex = new Map();
 let positionsById = new Map();
 let regionsById = new Map();
 let selectedNeuronId = null;
+let stimulatedRegionId = null;
 const scratchMatrix = new THREE.Matrix4();
 const scratchColor = new THREE.Color();
 
@@ -187,13 +190,21 @@ function applyFrame(frame) {
   const spiked = new Set(frame.neurons.filter((neuron) => neuron.spiked).map((neuron) => neuron.id));
 
   frame.neurons.forEach((neuron, index) => {
-    const radius = neuron.spiked ? 0.046 : neuron.kind === 'inhibitory' ? 0.024 : 0.029;
-    const intensity = Math.min(1, Math.max(0, neuron.voltage));
+    const stimulated = neuron.region_id === stimulatedRegionId;
+    const gain = Number(els.stimGain.value || 0);
+    const radius = neuron.spiked
+      ? 0.046
+      : stimulated
+        ? 0.034 + gain * 0.018
+        : neuron.kind === 'inhibitory' ? 0.024 : 0.029;
+    const intensity = Math.min(1, Math.max(0, neuron.voltage + (stimulated ? gain * 0.45 : 0)));
     scratchMatrix.makeScale(radius, radius, radius);
     scratchMatrix.setPosition(neuron.position[0], neuron.position[1], neuron.position[2]);
     neuronsMesh.setMatrixAt(index, scratchMatrix);
 
-    if (neuron.id === selectedNeuronId) {
+    if (stimulated) {
+      scratchColor.setRGB(1.0, 0.77 + gain * 0.2, 0.28 + intensity * 0.25);
+    } else if (neuron.id === selectedNeuronId) {
       scratchColor.setRGB(0.84, 1.0, 0.58);
     } else if (neuron.spiked) {
       scratchColor.setRGB(1.0, 0.96, 0.72);
@@ -231,6 +242,9 @@ function applyFrame(frame) {
   els.synapses.textContent = String(frame.synapses_total ?? (frame.synapses || []).length);
   els.active.textContent = String(frame.metrics?.active_output_spikes ?? 0);
   els.voltage.textContent = Number(frame.metrics?.mean_sample_voltage ?? 0).toFixed(3);
+  els.stimTarget.textContent = stimulatedRegionId == null
+    ? 'none'
+    : regionsById.get(stimulatedRegionId)?.name ?? String(stimulatedRegionId);
   els.learningValue.textContent = frame.metrics?.mean_abs_weight == null
     ? '-'
     : Number(frame.metrics.mean_abs_weight).toFixed(3);
@@ -321,7 +335,7 @@ function renderRegions(regions) {
   els.regions.textContent = '';
   for (const region of regions) {
     const row = document.createElement('div');
-    row.className = 'region-row';
+    row.className = region.id === stimulatedRegionId ? 'region-row is-stimulated' : 'region-row';
     const swatch = document.createElement('i');
     swatch.className = 'swatch';
     const color = region.color || [0.4, 0.7, 1.0];
@@ -330,6 +344,11 @@ function renderRegions(regions) {
     name.textContent = region.name || `region ${region.id}`;
     const radius = document.createElement('strong');
     radius.textContent = Number(region.radius || 0).toFixed(2);
+    row.addEventListener('click', () => {
+      stimulatedRegionId = stimulatedRegionId === region.id ? null : region.id;
+      renderRegions(regions);
+      applyFrame(frames[frameIndex]);
+    });
     row.append(swatch, name, radius);
     els.regions.append(row);
   }
@@ -414,6 +433,7 @@ els.playPause.addEventListener('click', () => {
 els.stepBack.addEventListener('click', () => selectFrame(frameIndex - 1));
 els.stepForward.addEventListener('click', () => selectFrame(frameIndex + 1));
 els.slider.addEventListener('input', () => selectFrame(Number(els.slider.value)));
+els.stimGain.addEventListener('input', () => frames.length && applyFrame(frames[frameIndex]));
 canvas.addEventListener('pointerdown', pickNeuron);
 
 loadSnapshotText(`

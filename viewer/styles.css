@@ -170,6 +170,49 @@ input {
   text-overflow: ellipsis;
 }
 
+#stimulus-panel {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(177, 194, 224, 0.14);
+  border-radius: 8px;
+  background: #151a23;
+}
+
+#stimulus-panel h2 {
+  margin: 0;
+  color: #dfe9fb;
+  font-size: 14px;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.stimulus-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.stimulus-row span {
+  color: #96a4ba;
+  font-size: 12px;
+}
+
+.stimulus-row strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 580;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#stim-gain {
+  width: 100%;
+  accent-color: #ffd166;
+}
+
 #region-list {
   display: grid;
   gap: 8px;
@@ -183,6 +226,15 @@ input {
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid rgba(177, 194, 224, 0.12);
+  cursor: pointer;
+}
+
+.region-row:hover {
+  color: #ffffff;
+}
+
+.region-row.is-stimulated {
+  color: #ffd166;
 }
 
 .swatch {

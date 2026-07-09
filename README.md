@@ -81,7 +81,7 @@ cd viewer
 python3 -m http.server 5173
 ```
 
-Then open `http://127.0.0.1:5173`.
+Then open `http://127.0.0.1:5173`. The viewer can also apply offline region stimulation overlays before live streaming is enabled.
 
 ## Simulation Model
 
