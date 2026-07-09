@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Advanced-SNN Brain Viewer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="app-shell">
+    <section id="scene-panel" aria-label="Brain activity scene">
+      <canvas id="brain-canvas"></canvas>
+      <div id="hud">
+        <div>step <strong id="step-value">0</strong></div>
+        <div>spikes <strong id="spike-value">0</strong></div>
+        <div>events <strong id="event-value">0</strong></div>
+      </div>
+      <div id="toolbar" role="toolbar" aria-label="Playback controls">
+        <button id="load-sample" title="Load bundled sample">◉</button>
+        <label class="file-button" title="Open snapshot file">
+          ⌁
+          <input id="snapshot-file" type="file" accept=".ndjson,.jsonl,.txt,application/x-ndjson">
+        </label>
+        <button id="play-pause" title="Play or pause">▶</button>
+        <button id="step-back" title="Previous step">‹</button>
+        <button id="step-forward" title="Next step">›</button>
+        <input id="frame-slider" title="Frame" type="range" min="0" max="0" value="0">
+        <select id="speed-select" title="Playback speed">
+          <option value="250">0.25x</option>
+          <option value="120" selected>0.5x</option>
+          <option value="60">1x</option>
+          <option value="30">2x</option>
+        </select>
+      </div>
+    </section>
+    <aside id="side-panel">
+      <header>
+        <h1>Brain Viewer</h1>
+        <span id="frame-count">0 frames</span>
+      </header>
+      <section class="metrics-grid" aria-label="Metrics">
+        <div><span>neurons</span><strong id="neurons-value">0</strong></div>
+        <div><span>synapses</span><strong id="synapses-value">0</strong></div>
+        <div><span>active</span><strong id="active-value">0</strong></div>
+        <div><span>voltage</span><strong id="voltage-value">0.000</strong></div>
+      </section>
+      <section id="region-list" aria-label="Regions"></section>
+      <section id="status-line" aria-live="polite">No snapshot loaded</section>
+    </aside>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

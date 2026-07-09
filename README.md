@@ -64,6 +64,17 @@ cargo run --release -- cpu --neurons 512 --fanout 16 --steps 100 --seed 1 \
 
 Snapshots are written as newline-delimited JSON. Each line contains sampled neuron positions, voltage, spike state, sampled synapses, and cumulative metrics for one timestep.
 
+## Viewer
+
+A static Three.js snapshot viewer lives in `viewer/`. Serve it locally and load `.ndjson` snapshots from the `brain` or `cpu` commands:
+
+```bash
+cd viewer
+python3 -m http.server 5173
+```
+
+Then open `http://127.0.0.1:5173`.
+
 ## Simulation Model
 
 Each neuron stores voltage, input current, and remaining refractory steps. On each timestep, the simulator clears input current, applies deterministic external input, processes outgoing synapses from active spikes, updates all neurons with the LIF rule, and swaps the active spike buffers.
