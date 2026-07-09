@@ -94,8 +94,6 @@ const terminalMaterial = new THREE.MeshStandardMaterial({
 
 const els = {
   file: document.querySelector('#snapshot-file'),
-  loadSample: document.querySelector('#load-sample'),
-  connectLive: document.querySelector('#connect-live'),
   playPause: document.querySelector('#play-pause'),
   stepBack: document.querySelector('#step-back'),
   stepForward: document.querySelector('#step-forward'),
@@ -133,7 +131,6 @@ let positionsById = new Map();
 let regionsById = new Map();
 let selectedNeuronId = null;
 let stimulatedRegionId = null;
-let liveAbortController = null;
 const scratchMatrix = new THREE.Matrix4();
 const scratchColor = new THREE.Color();
 
@@ -146,7 +143,6 @@ function parseNdjson(text) {
 }
 
 async function loadSnapshotText(text, label) {
-  stopLiveStream();
   frames = parseNdjson(text);
   if (!frames.length) {
     throw new Error('snapshot has no frames');
@@ -160,71 +156,6 @@ async function loadSnapshotText(text, label) {
   els.status.textContent = label;
   buildStaticGeometry(frames[0]);
   applyFrame(frames[0]);
-}
-
-async function connectLiveStream() {
-  stopLiveStream();
-  liveAbortController = new AbortController();
-  frames = [];
-  frameIndex = 0;
-  playing = true;
-  els.playPause.textContent = 'Ⅱ';
-  els.frameCount.textContent = '0 frames';
-  els.status.textContent = 'connecting live.ndjson';
-
-  const response = await fetch('live.ndjson', { signal: liveAbortController.signal });
-  if (!response.ok) {
-    throw new Error(`live stream unavailable: ${response.status}`);
-  }
-  if (!response.body) {
-    await loadSnapshotText(await response.text(), 'live.ndjson');
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  els.status.textContent = 'live stream connected';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
-      }
-      appendLiveFrame(JSON.parse(trimmed));
-    }
-  }
-  if (buffer.trim()) {
-    appendLiveFrame(JSON.parse(buffer.trim()));
-  }
-  els.status.textContent = 'live stream ended';
-}
-
-function appendLiveFrame(frame) {
-  frames.push(frame);
-  els.slider.max = String(frames.length - 1);
-  els.frameCount.textContent = `${frames.length} frames`;
-  if (frames.length === 1) {
-    buildStaticGeometry(frame);
-  }
-  if (playing || frames.length === 1) {
-    selectFrame(frames.length - 1);
-  }
-}
-
-function stopLiveStream() {
-  if (liveAbortController) {
-    liveAbortController.abort();
-    liveAbortController = null;
-  }
 }
 
 function buildStaticGeometry(frame) {
@@ -562,28 +493,6 @@ els.file.addEventListener('change', async (event) => {
   }
 });
 
-els.loadSample.addEventListener('click', async () => {
-  try {
-    const response = await fetch('sample.ndjson');
-    if (!response.ok) {
-      throw new Error(`sample unavailable: ${response.status}`);
-    }
-    await loadSnapshotText(await response.text(), 'sample.ndjson');
-  } catch (error) {
-    els.status.textContent = error.message;
-  }
-});
-
-els.connectLive.addEventListener('click', async () => {
-  try {
-    await connectLiveStream();
-  } catch (error) {
-    if (error.name !== 'AbortError') {
-      els.status.textContent = error.message;
-    }
-  }
-});
-
 els.playPause.addEventListener('click', () => {
   playing = !playing;
   els.playPause.textContent = playing ? 'Ⅱ' : '▶';
@@ -596,61 +505,5 @@ els.stimGain.addEventListener('input', () => frames.length && applyFrame(frames[
 els.scaleMode.addEventListener('change', () => frames.length && applyFrame(frames[frameIndex]));
 canvas.addEventListener('pointerdown', pickNeuron);
 
-loadSnapshotText(`
-${sampleFrame(0, 0)}
-${sampleFrame(1, 8)}
-${sampleFrame(2, 14)}
-${sampleFrame(3, 21)}
-${sampleFrame(4, 26)}
-`, 'generated sample');
+els.status.textContent = 'Load a Roihu snapshot NDJSON file';
 requestAnimationFrame(animate);
-
-function sampleFrame(step, offset) {
-  const regions = [
-    { id: 0, name: 'sensory', center: [-0.7, -0.15, 0.05], radius: 0.42, color: [0.18, 0.72, 1.0] },
-    { id: 1, name: 'association', center: [-0.15, 0.16, 0.02], radius: 0.5, color: [0.62, 0.92, 0.35] },
-    { id: 2, name: 'memory', center: [0.36, -0.18, -0.08], radius: 0.44, color: [1.0, 0.67, 0.23] },
-    { id: 3, name: 'motor', center: [0.78, 0.12, 0.1], radius: 0.4, color: [1.0, 0.28, 0.42] },
-  ];
-  const neurons = [];
-  for (let i = 0; i < 180; i += 1) {
-    const region = regions[i % regions.length];
-    const a = i * 2.399 + step * 0.025;
-    const r = ((i * 37) % 100) / 100 * region.radius;
-    const z = ((((i * 19) % 100) / 100) - 0.5) * region.radius;
-    neurons.push({
-      id: i,
-      region_id: region.id,
-      kind: i % 6 === 0 ? 'inhibitory' : 'excitatory',
-      position: [
-        region.center[0] + Math.cos(a) * r,
-        region.center[1] + Math.sin(a) * r * 0.75,
-        region.center[2] + z,
-      ],
-      voltage: ((i + step * 7) % 30) / 30,
-      input_current: 0,
-      refractory_left: 0,
-      spiked: (i + offset) % 29 === 0,
-    });
-  }
-  const synapses = [];
-  for (let i = 0; i < 280; i += 1) {
-    synapses.push({ source: i % 180, target: (i * 17 + 11) % 180, weight: i % 6 === 0 ? -0.04 : 0.04 });
-  }
-  return JSON.stringify({
-    schema_version: 2,
-    step,
-    neurons_total: 180,
-    synapses_total: 280,
-    regions,
-    neurons,
-    synapses,
-    metrics: {
-      total_spikes: step * 21,
-      active_input_spikes: Math.max(0, step * 4),
-      active_output_spikes: 7 + step,
-      synapse_events_processed: step * 420,
-      mean_sample_voltage: 0.32 + step * 0.03,
-    },
-  });
-}

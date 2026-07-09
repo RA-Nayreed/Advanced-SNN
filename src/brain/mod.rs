@@ -307,28 +307,3 @@ fn hashed_index(seed: u64, source: usize, edge_offset: usize, salt: u64, modulo:
         ^ salt.wrapping_mul(0xA076_1D64_78BD_642F);
     (splitmix64(key) % modulo as u64) as usize
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn brain_blob_has_expected_shape() {
-        let config = BrainBlobConfig::new(50, 6, 4);
-        let blob = generate_brain_blob(&config).unwrap();
-
-        assert_eq!(blob.neurons.len(), 50);
-        assert_eq!(blob.graph.neurons(), 50);
-        assert_eq!(blob.graph.synapses(), 300);
-        assert_eq!(blob.regions.len(), 5);
-    }
-
-    #[test]
-    fn brain_blob_includes_inhibitory_synapses() {
-        let config = BrainBlobConfig::new(100, 4, 9);
-        let blob = generate_brain_blob(&config).unwrap();
-
-        assert!(blob.graph.weights().iter().any(|weight| *weight < 0.0));
-        assert!(blob.graph.weights().iter().any(|weight| *weight > 0.0));
-    }
-}

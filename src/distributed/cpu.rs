@@ -7,7 +7,7 @@ use crate::distributed::graph::generate_distributed_random_graph;
 use crate::distributed::partition::NeuronPartition;
 use crate::distributed::runtime::{initialize_mpi, DistributedRuntime};
 
-pub fn run_distributed_cpu_smoke(config: &SimulationConfig) -> Result<()> {
+pub fn run_distributed_cpu_probe(config: &SimulationConfig) -> Result<()> {
     config.validate()?;
 
     let universe = initialize_mpi()?;
@@ -43,7 +43,7 @@ pub fn run_distributed_cpu_smoke(config: &SimulationConfig) -> Result<()> {
     );
 
     if runtime.world_rank == 0 {
-        println!("distributed_cpu_smoke=true");
+        println!("distributed_cpu_probe=true");
         println!("world_size={}", runtime.world_size);
         println!("neurons={}", config.neurons);
         println!("fanout={}", config.fanout);

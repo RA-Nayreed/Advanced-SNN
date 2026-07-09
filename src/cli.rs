@@ -191,7 +191,7 @@ fn run_gpu_event(args: GraphArgs) -> Result<()> {
 fn run_distributed_cpu(args: GraphArgs) -> Result<()> {
     let config = args.to_simulation_config();
     config.validate()?;
-    crate::distributed::cpu::run_distributed_cpu_smoke(&config)
+    crate::distributed::cpu::run_distributed_cpu_probe(&config)
 }
 
 impl GraphArgs {
