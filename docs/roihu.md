@@ -17,7 +17,7 @@ These Slurm profiles follow the CSC Roihu documentation checked on 2026-07-09.
 
 | Mode | Script | Partition | Nodes | Tasks and cores | GPU request | Purpose |
 | --- | --- | --- | --- | --- | --- | --- |
-| CPU | `scripts/roihu/validate_big_update.sbatch` | `small` | 1 | `--ntasks=1 --cpus-per-task=16` | none | CPU build, brain snapshot, learning snapshot, MPI probe |
+| CPU | `scripts/roihu/validate_big_update.sbatch` | `small` | 1 | `--ntasks=1 --cpus-per-task=16` | none | CPU build, required MPI feature build, brain snapshot, learning snapshot, distributed MPI probe |
 | Single GPU | `scripts/roihu/validate_gpu_single.sbatch` | `gpumedium` | 1 | `--ntasks-per-node=1 --cpus-per-task=72` | `--gres=gpu:gh200:1` | CUDA build and one GH200 event-backend run |
 | Multi GPU smoke | `scripts/roihu/validate_gpu_multi.sbatch` | `gpumedium` | 1 | `--ntasks-per-node=4 --cpus-per-task=72` | `--gres=gpu:gh200:4` | Four independent rank-local GPU event runs, one per reserved GH200 |
 
@@ -50,17 +50,17 @@ sbatch --account=<project> scripts/roihu/validate_gpu_multi.sbatch
 
 ## Modules
 
-The scripts do not hard-code Rust, CUDA, GCC, or MPI module names. Set `ROIHU_MODULES` to the current Roihu module names for your environment:
+The scripts do not hard-code Rust, CUDA, GCC, MPI, or LLVM/Clang module names. CPU validation requires a working MPI build environment because distributed MPI support is a core project target. Set `ROIHU_MODULES` to the current Roihu module names for your environment:
 
 ```bash
-export ROIHU_MODULES="rust gcc openmpi"
+export ROIHU_MODULES="gcc/15.2.0 openmpi/5.0.10 <llvm-or-clang-module>"
 scripts/roihu/submit_validation.sh --account <project> cpu
 
 export ROIHU_MODULES="rust gcc cuda"
 scripts/roihu/submit_validation.sh --account <project> gpu
 ```
 
-If `ROIHU_MODULES` is unset, the scripts use whatever `cargo`, `nvcc`, `srun`, and `mpirun` are already available in the batch shell.
+If `ROIHU_MODULES` is unset, the scripts use whatever `cargo`, `nvcc`, `srun`, `mpicc`, and `mpirun` are already available in the batch shell. CPU validation fails if the MPI feature cannot build. The Rust `mpi-sys` crate uses bindgen, so Roihu must also expose `libclang` through an LLVM/Clang module or `LIBCLANG_PATH`.
 
 ## Thread and Core Settings
 
@@ -106,10 +106,11 @@ The CPU validation job performs:
 
 1. Environment capture: host, Slurm job id, partition, node count, core/thread settings, module set, and output directory.
 2. Release CPU build.
-3. Brain snapshot run.
-4. STDP learning snapshot run.
-5. MPI/distributed probe when MPI support is available.
-6. Output size checks for generated `.ndjson` files.
+3. Required MPI feature build.
+4. Brain snapshot run.
+5. STDP learning snapshot run.
+6. Required MPI/distributed probe.
+7. Output size checks for generated `.ndjson` files.
 
 GPU jobs additionally capture `nvidia-smi` and CUDA visibility.
 

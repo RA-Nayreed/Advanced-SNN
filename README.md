@@ -74,7 +74,7 @@ scripts/roihu/submit_validation.sh --account <project> gpu
 scripts/roihu/submit_validation.sh --account <project> multi-gpu
 ```
 
-The CPU profile uses `small` with 1 node, 1 task, and 16 CPU cores. The single-GPU profile uses `gpumedium` with 1 GH200 and 72 CPU cores. The multi-GPU smoke profile uses `gpumedium` with 4 GH200 GPUs, 4 tasks, and 72 CPU cores per task.
+The CPU profile uses `small` with 1 node, 1 task, 16 CPU cores, and a required MPI feature build/probe. The single-GPU profile uses `gpumedium` with 1 GH200 and 72 CPU cores. The multi-GPU smoke profile uses `gpumedium` with 4 GH200 GPUs, 4 tasks, and 72 CPU cores per task.
 
 ## Viewer
 

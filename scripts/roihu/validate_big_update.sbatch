@@ -73,6 +73,25 @@ mpi_build_available() {
 
 cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
 
+if ! mpi_build_available; then
+  {
+    echo "Required MPI build environment is not available."
+    echo "Load Roihu compiler and OpenMPI modules, for example:"
+    echo "  export ROIHU_MODULES='gcc/15.2.0 openmpi/5.0.10 <llvm-or-clang-module>'"
+    echo "If mpi-sys later reports missing libclang, also load a Roihu LLVM/Clang module or set LIBCLANG_PATH."
+  } | tee "${OUT_DIR}/build_mpi.log"
+  exit 1
+fi
+
+if ! cargo build --release --features mpi 2>&1 | tee "${OUT_DIR}/build_mpi.log"; then
+  {
+    echo "Required MPI feature build failed."
+    echo "See ${OUT_DIR}/build_mpi.log."
+    echo "Common cause on Roihu: bindgen requires libclang; load a Roihu LLVM/Clang module or set LIBCLANG_PATH."
+  } | tee "${OUT_DIR}/distributed_probe.log"
+  exit 1
+fi
+
 ./target/release/advanced-snn brain \
   --neurons 20000 \
   --fanout 64 \
@@ -97,35 +116,20 @@ cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
   --snapshot-synapses 20000 \
   2>&1 | tee "${OUT_DIR}/brain_learning.log"
 
-if mpi_build_available; then
-  if cargo build --release --features mpi 2>&1 | tee "${OUT_DIR}/build_mpi.log"; then
-    if command -v srun >/dev/null 2>&1; then
-      srun --ntasks=1 ./target/release/advanced-snn distributed-cpu \
-        --neurons 20000 \
-        --fanout 64 \
-        --steps 10 \
-        --seed 7 \
-        2>&1 | tee "${OUT_DIR}/distributed_probe.log"
-    else
-      mpirun -np 1 ./target/release/advanced-snn distributed-cpu \
-        --neurons 20000 \
-        --fanout 64 \
-        --steps 10 \
-        --seed 7 \
-        2>&1 | tee "${OUT_DIR}/distributed_probe.log"
-    fi
-  else
-    {
-      echo "MPI feature build failed; distributed probe skipped."
-      echo "See ${OUT_DIR}/build_mpi.log."
-      echo "Common cause: bindgen requires libclang; load a Roihu LLVM/Clang module or set LIBCLANG_PATH."
-    } | tee "${OUT_DIR}/distributed_probe.log"
-  fi
+if command -v srun >/dev/null 2>&1; then
+  srun --ntasks=1 ./target/release/advanced-snn distributed-cpu \
+    --neurons 20000 \
+    --fanout 64 \
+    --steps 10 \
+    --seed 7 \
+    2>&1 | tee "${OUT_DIR}/distributed_probe.log"
 else
-  {
-    echo "MPI build environment not available; distributed probe skipped."
-    echo "Set ROIHU_MODULES to include Roihu OpenMPI, or otherwise provide mpicc/MPI_PKG_CONFIG."
-  } | tee "${OUT_DIR}/distributed_probe.log"
+  mpirun -np 1 ./target/release/advanced-snn distributed-cpu \
+    --neurons 20000 \
+    --fanout 64 \
+    --steps 10 \
+    --seed 7 \
+    2>&1 | tee "${OUT_DIR}/distributed_probe.log"
 fi
 
 wc -l "${OUT_DIR}"/*.ndjson | tee "${OUT_DIR}/snapshot_line_counts.txt"
