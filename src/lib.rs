@@ -1,3 +1,4 @@
+pub mod brain;
 pub mod cli;
 pub mod config;
 pub mod cpu;

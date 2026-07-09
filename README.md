@@ -5,6 +5,7 @@ Advanced-SNN is a Rust-based spiking neural network simulator with a CPU referen
 ## Current Status
 
 - CPU reference simulator: implemented as a deterministic event-driven baseline.
+- Brain blob CPU mode: implemented with clustered regions, excitatory/inhibitory neurons, and visualization snapshots.
 - Dense GPU baseline: implemented for CUDA LIF neuron updates only.
 - Event-driven GPU backend: implemented for single-GPU outgoing CSR traversal with `atomicAdd`.
 - MPI and multi-GPU execution are intentionally not implemented yet.
@@ -43,6 +44,13 @@ Event-driven GPU backend:
 
 ```bash
 cargo run --release --features cuda -- gpu-event --neurons 100000 --fanout 64 --steps 100 --seed 1
+```
+
+Brain blob CPU mode:
+
+```bash
+cargo run --release -- brain --neurons 2000 --fanout 32 --steps 200 --seed 7 \
+  --snapshot-out brain_blob.ndjson --snapshot-every 2 --snapshot-neurons 1500 --snapshot-synapses 4000
 ```
 
 Script wrappers are available under `scripts/`.
@@ -89,6 +97,7 @@ If CUDA is unavailable, GPU tests skip after receiving the CUDA-unavailable erro
 
 ## Current Limitations
 
+- brain blob mode is biologically inspired, not an anatomically exact brain model
 - no MPI yet
 - no multi-GPU execution yet
 - no synaptic delays yet

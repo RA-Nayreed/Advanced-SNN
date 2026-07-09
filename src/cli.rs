@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
+use crate::brain::{generate_brain_blob, BrainBlobConfig};
 use crate::config::{DenseSimulationConfig, SimulationConfig};
 use crate::cpu::reference::run_reference;
 use crate::gpu;
@@ -21,6 +22,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     Cpu(CpuArgs),
+    Brain(CpuArgs),
     GpuDense(DenseArgs),
     GpuEvent(GraphArgs),
 
@@ -96,6 +98,7 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Cpu(args) => run_cpu(args),
+        Command::Brain(args) => run_brain(args),
         Command::GpuDense(args) => run_gpu_dense(args),
         Command::GpuEvent(args) => run_gpu_event(args),
 
@@ -112,6 +115,28 @@ fn run_cpu(args: CpuArgs) -> Result<()> {
         run_reference_with_snapshots(&config, &graph, options)?
     } else {
         run_reference(&config, &graph)?
+    };
+    print!("{}", result.metrics);
+    Ok(())
+}
+
+
+fn run_brain(args: CpuArgs) -> Result<()> {
+    let config = args.graph.to_simulation_config();
+    config.validate()?;
+    let brain = generate_brain_blob(&BrainBlobConfig::new(
+        config.neurons,
+        config.fanout,
+        config.seed,
+    ))?;
+    let result = if let Some(options) = args
+        .snapshot
+        .to_options()
+        .map(|options| options.with_layout(brain.snapshot_layout()))
+    {
+        run_reference_with_snapshots(&config, &brain.graph, options)?
+    } else {
+        run_reference(&config, &brain.graph)?
     };
     print!("{}", result.metrics);
     Ok(())
@@ -176,6 +201,7 @@ impl SnapshotArgs {
             every: self.snapshot_every,
             neuron_sample: self.snapshot_neurons,
             synapse_sample: self.snapshot_synapses,
+            layout: None,
         })
     }
 }

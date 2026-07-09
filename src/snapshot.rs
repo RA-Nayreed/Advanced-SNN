@@ -16,6 +16,7 @@ pub struct SnapshotOptions {
     pub every: usize,
     pub neuron_sample: usize,
     pub synapse_sample: usize,
+    pub layout: Option<SnapshotLayout>,
 }
 
 impl SnapshotOptions {
@@ -28,6 +29,74 @@ impl SnapshotOptions {
         }
         Ok(())
     }
+
+    pub fn with_layout(mut self, layout: SnapshotLayout) -> Self {
+        self.layout = Some(layout);
+        self
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SnapshotLayout {
+    pub regions: Vec<SnapshotRegion>,
+    pub positions: Vec<[f32; 3]>,
+    pub region_ids: Vec<usize>,
+    pub kinds: Vec<String>,
+}
+
+impl SnapshotLayout {
+    pub fn new(
+        regions: Vec<SnapshotRegion>,
+        positions: Vec<[f32; 3]>,
+        region_ids: Vec<usize>,
+        kinds: Vec<String>,
+    ) -> Self {
+        Self {
+            regions,
+            positions,
+            region_ids,
+            kinds,
+        }
+    }
+
+    pub fn synthetic(seed: u64, neurons: usize) -> Self {
+        Self {
+            regions: vec![SnapshotRegion {
+                id: 0,
+                name: String::from("synthetic"),
+                center: [0.0, 0.0, 0.0],
+                radius: 1.0,
+                color: [0.4, 0.85, 1.0],
+            }],
+            positions: (0..neurons)
+                .map(|id| synthetic_position(seed, neurons, id))
+                .collect(),
+            region_ids: vec![0; neurons],
+            kinds: vec![String::from("excitatory"); neurons],
+        }
+    }
+
+    pub fn validate(&self, neurons: usize) -> Result<()> {
+        if self.positions.len() != neurons
+            || self.region_ids.len() != neurons
+            || self.kinds.len() != neurons
+        {
+            bail!("snapshot layout buffers must match neuron count");
+        }
+        if self.regions.is_empty() {
+            bail!("snapshot layout must include at least one region");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SnapshotRegion {
+    pub id: usize,
+    pub name: String,
+    pub center: [f32; 3],
+    pub radius: f32,
+    pub color: [f32; 3],
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -40,6 +109,8 @@ pub struct SnapshotSynapse {
 #[derive(Clone, Debug, Serialize)]
 pub struct SnapshotNeuron {
     pub id: u32,
+    pub region_id: usize,
+    pub kind: String,
     pub position: [f32; 3],
     pub voltage: f32,
     pub input_current: f32,
@@ -62,6 +133,7 @@ pub struct SimulationSnapshot {
     pub step: usize,
     pub neurons_total: usize,
     pub synapses_total: usize,
+    pub regions: Vec<SnapshotRegion>,
     pub neurons: Vec<SnapshotNeuron>,
     pub synapses: Vec<SnapshotSynapse>,
     pub metrics: SnapshotMetrics,
@@ -81,7 +153,7 @@ struct SnapshotWriter {
     writer: BufWriter<File>,
     every: usize,
     neuron_ids: Vec<usize>,
-    positions: Vec<[f32; 3]>,
+    layout: SnapshotLayout,
     synapses: Vec<SnapshotSynapse>,
     neurons_total: usize,
     synapses_total: usize,
@@ -91,16 +163,17 @@ impl SnapshotWriter {
     fn create(config: &SimulationConfig, graph: &CsrGraph, options: SnapshotOptions) -> Result<Self> {
         let file = File::create(&options.output)?;
         let neuron_ids = sampled_indices(config.neurons, options.neuron_sample);
-        let positions = (0..config.neurons)
-            .map(|id| synthetic_position(config.seed, config.neurons, id))
-            .collect();
+        let layout = options
+            .layout
+            .unwrap_or_else(|| SnapshotLayout::synthetic(config.seed, config.neurons));
+        layout.validate(config.neurons)?;
         let synapses = sample_synapses(graph, options.synapse_sample);
 
         Ok(Self {
             writer: BufWriter::new(file),
             every: options.every,
             neuron_ids,
-            positions,
+            layout,
             synapses,
             neurons_total: config.neurons,
             synapses_total: graph.synapses(),
@@ -121,7 +194,9 @@ impl SnapshotWriter {
                 voltage_sum += voltage;
                 SnapshotNeuron {
                     id: id as u32,
-                    position: self.positions[id],
+                    region_id: self.layout.region_ids[id],
+                    kind: self.layout.kinds[id].clone(),
+                    position: self.layout.positions[id],
                     voltage,
                     input_current: trace.state.input_current[id],
                     refractory_left: trace.state.refractory_left[id],
@@ -137,10 +212,11 @@ impl SnapshotWriter {
         };
 
         let snapshot = SimulationSnapshot {
-            schema_version: 1,
+            schema_version: 2,
             step: trace.step,
             neurons_total: self.neurons_total,
             synapses_total: self.synapses_total,
+            regions: self.layout.regions.clone(),
             neurons,
             synapses: self.synapses.clone(),
             metrics: SnapshotMetrics {
