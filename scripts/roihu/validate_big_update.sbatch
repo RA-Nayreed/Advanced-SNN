@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=advanced-snn-validation
-#SBATCH --account=REPLACE_WITH_ROIHU_ACCOUNT
-#SBATCH --partition=REPLACE_WITH_ROIHU_PARTITION
+#SBATCH --partition=small
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -22,18 +21,41 @@ mkdir -p "${OUT_DIR}"
   echo "host=$(hostname)"
   echo "date=$(date --iso-8601=seconds)"
   echo "workdir=$(pwd)"
+  echo "roihu_profile=cpu-small-shared-node"
+  echo "slurm_partition=${SLURM_JOB_PARTITION:-${SLURM_PARTITION:-unset}}"
+  echo "slurm_nodes=${SLURM_JOB_NUM_NODES:-unset}"
+  echo "slurm_ntasks=${SLURM_NTASKS:-unset}"
   echo "slurm_cpus_per_task=${SLURM_CPUS_PER_TASK:-unset}"
+  echo "slurm_mem_per_node=${SLURM_MEM_PER_NODE:-unset}"
 } | tee "${OUT_DIR}/environment.txt"
 
-# Replace these with the exact Roihu module names from the current Roihu documentation.
-module purge || true
-# module load rust
-# module load cuda
-# module load gcc
-# module load openmpi
-module list 2>&1 | tee -a "${OUT_DIR}/environment.txt"
+# Submit with:
+#   sbatch --account=<project> scripts/roihu/validate_big_update.sbatch
+#
+# Load modules through ROIHU_MODULES so site-specific module names are not
+# hard-coded in the repository, for example:
+#   sbatch --account=<project> --export=ALL,ROIHU_MODULES="rust gcc openmpi" ...
+if command -v module >/dev/null 2>&1; then
+  module purge || true
+  if [[ -n "${ROIHU_MODULES:-}" ]]; then
+    # shellcheck disable=SC2086
+    module load ${ROIHU_MODULES}
+  else
+    echo "ROIHU_MODULES unset; using modules already available on PATH." | tee -a "${OUT_DIR}/environment.txt"
+  fi
+  module list 2>&1 | tee -a "${OUT_DIR}/environment.txt"
+else
+  echo "Environment modules are unavailable in this shell." | tee -a "${OUT_DIR}/environment.txt"
+fi
 
-export RAYON_NUM_THREADS="${SLURM_CPUS_PER_TASK:-16}"
+THREADS="${SLURM_CPUS_PER_TASK:-1}"
+export OMP_NUM_THREADS="${THREADS}"
+export RAYON_NUM_THREADS="${THREADS}"
+export CARGO_BUILD_JOBS="${THREADS}"
+export OMP_PLACES=cores
+export OMP_PROC_BIND=spread
+export OPENBLAS_NUM_THREADS="${THREADS}"
+export MKL_NUM_THREADS="${THREADS}"
 
 cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
 
@@ -60,19 +82,6 @@ cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
   --snapshot-neurons 5000 \
   --snapshot-synapses 20000 \
   2>&1 | tee "${OUT_DIR}/brain_learning.log"
-
-if command -v nvidia-smi >/dev/null 2>&1; then
-  nvidia-smi 2>&1 | tee "${OUT_DIR}/nvidia-smi.log"
-  cargo build --release --features cuda 2>&1 | tee "${OUT_DIR}/build_cuda.log"
-  ./target/release/advanced-snn gpu-event \
-    --neurons 100000 \
-    --fanout 64 \
-    --steps 200 \
-    --seed 7 \
-    2>&1 | tee "${OUT_DIR}/gpu_event.log"
-else
-  echo "CUDA device not visible in this allocation; GPU backend validation skipped by allocation state." | tee "${OUT_DIR}/gpu_event.log"
-fi
 
 if command -v mpirun >/dev/null 2>&1 || command -v srun >/dev/null 2>&1; then
   cargo build --release --features mpi 2>&1 | tee "${OUT_DIR}/build_mpi.log"

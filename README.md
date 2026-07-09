@@ -66,13 +66,15 @@ cargo run --release --features cuda -- gpu-event --neurons 100000 --fanout 64 --
 
 Validation is Roihu-only and is intended after substantial updates. The repository does not track workstation validation fixtures snapshots.
 
-Detailed instructions are in `docs/roihu.md`. The Slurm entry point is:
+Detailed instructions are in `docs/roihu.md`. Use the submit wrapper to pass the active Roihu billing project/account:
 
 ```bash
-sbatch scripts/roihu/validate_big_update.sbatch
+scripts/roihu/submit_validation.sh --account <project> cpu
+scripts/roihu/submit_validation.sh --account <project> gpu
+scripts/roihu/submit_validation.sh --account <project> multi-gpu
 ```
 
-Before submitting, edit the script placeholders for the active Roihu account, partition, GPU request, wall time, and module names.
+The CPU profile uses `small` with 1 node, 1 task, and 16 CPU cores. The single-GPU profile uses `gpumedium` with 1 GH200 and 72 CPU cores. The multi-GPU smoke profile uses `gpumedium` with 4 GH200 GPUs, 4 tasks, and 72 CPU cores per task.
 
 ## Viewer
 
