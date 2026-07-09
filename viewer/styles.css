@@ -203,6 +203,48 @@ input {
   font-weight: 520;
 }
 
+#selected-neuron {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+#selected-neuron h2 {
+  margin: 0;
+  color: #dfe9fb;
+  font-size: 14px;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+#selected-neuron dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+#selected-neuron dl div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+#selected-neuron dt {
+  color: #96a4ba;
+  font-size: 12px;
+}
+
+#selected-neuron dd {
+  margin: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 #status-line {
   margin-top: auto;
   color: #9ba8bd;

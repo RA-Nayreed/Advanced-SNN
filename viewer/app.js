@@ -21,6 +21,13 @@ controls.maxDistance = 8;
 const root = new THREE.Group();
 scene.add(root);
 
+const detailGroup = new THREE.Group();
+detailGroup.visible = false;
+root.add(detailGroup);
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
 const ambient = new THREE.AmbientLight(0x7d8da8, 0.5);
 scene.add(ambient);
 
@@ -63,6 +70,28 @@ const pulseMaterial = new THREE.PointsMaterial({
 let pulsePoints = new THREE.Points(new THREE.BufferGeometry(), pulseMaterial);
 root.add(pulsePoints);
 
+const somaMaterial = new THREE.MeshStandardMaterial({
+  color: 0xfff1a8,
+  emissive: 0x5a4214,
+  roughness: 0.22,
+  metalness: 0.02,
+});
+const dendriteMaterial = new THREE.LineBasicMaterial({
+  color: 0xa7f5ff,
+  transparent: true,
+  opacity: 0.82,
+});
+const axonMaterial = new THREE.LineBasicMaterial({
+  color: 0xffbd6e,
+  transparent: true,
+  opacity: 0.9,
+});
+const terminalMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  emissive: 0x7e5a22,
+  roughness: 0.25,
+});
+
 const els = {
   file: document.querySelector('#snapshot-file'),
   loadSample: document.querySelector('#load-sample'),
@@ -81,6 +110,10 @@ const els = {
   voltage: document.querySelector('#voltage-value'),
   regions: document.querySelector('#region-list'),
   status: document.querySelector('#status-line'),
+  selectedId: document.querySelector('#selected-id'),
+  selectedKind: document.querySelector('#selected-kind'),
+  selectedRegion: document.querySelector('#selected-region'),
+  selectedVoltage: document.querySelector('#selected-voltage'),
 };
 
 let frames = [];
@@ -89,6 +122,8 @@ let playing = false;
 let lastAdvance = 0;
 let neuronIdToIndex = new Map();
 let positionsById = new Map();
+let regionsById = new Map();
+let selectedNeuronId = null;
 const scratchMatrix = new THREE.Matrix4();
 const scratchColor = new THREE.Color();
 
@@ -143,6 +178,7 @@ function buildStaticGeometry(frame) {
   synapseLines.geometry = new THREE.BufferGeometry();
   synapseLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
 
+  regionsById = new Map((frame.regions || []).map((region) => [region.id, region]));
   renderRegions(frame.regions || []);
 }
 
@@ -156,7 +192,9 @@ function applyFrame(frame) {
     scratchMatrix.setPosition(neuron.position[0], neuron.position[1], neuron.position[2]);
     neuronsMesh.setMatrixAt(index, scratchMatrix);
 
-    if (neuron.spiked) {
+    if (neuron.id === selectedNeuronId) {
+      scratchColor.setRGB(0.84, 1.0, 0.58);
+    } else if (neuron.spiked) {
       scratchColor.setRGB(1.0, 0.96, 0.72);
     } else if (neuron.kind === 'inhibitory') {
       scratchColor.setRGB(1.0, 0.34 + intensity * 0.25, 0.42);
@@ -192,6 +230,87 @@ function applyFrame(frame) {
   els.synapses.textContent = String(frame.synapses_total ?? (frame.synapses || []).length);
   els.active.textContent = String(frame.metrics?.active_output_spikes ?? 0);
   els.voltage.textContent = Number(frame.metrics?.mean_sample_voltage ?? 0).toFixed(3);
+  updateSelectedNeuron(frame);
+}
+
+function updateSelectedNeuron(frame) {
+  const neuron = selectedNeuronId == null
+    ? null
+    : frame.neurons.find((candidate) => candidate.id === selectedNeuronId);
+  if (!neuron) {
+    detailGroup.visible = false;
+    els.selectedId.textContent = 'none';
+    els.selectedKind.textContent = '-';
+    els.selectedRegion.textContent = '-';
+    els.selectedVoltage.textContent = '0.000';
+    return;
+  }
+
+  const region = regionsById.get(neuron.region_id);
+  els.selectedId.textContent = String(neuron.id);
+  els.selectedKind.textContent = neuron.kind;
+  els.selectedRegion.textContent = region?.name ?? String(neuron.region_id);
+  els.selectedVoltage.textContent = Number(neuron.voltage || 0).toFixed(3);
+  buildBiologicalNeuron(neuron, frame);
+}
+
+function buildBiologicalNeuron(neuron, frame) {
+  clearDetailGroup();
+  detailGroup.visible = true;
+  const origin = new THREE.Vector3(...neuron.position);
+
+  const voltage = Math.min(1, Math.max(0, neuron.voltage || 0));
+  const soma = new THREE.Mesh(new THREE.SphereGeometry(0.088 + voltage * 0.035, 24, 16), somaMaterial);
+  soma.position.copy(origin);
+  detailGroup.add(soma);
+
+  const branchCount = neuron.kind === 'inhibitory' ? 7 : 10;
+  for (let i = 0; i < branchCount; i += 1) {
+    const angle = i * 2.399 + neuron.id * 0.13;
+    const vertical = ((i * 37 + neuron.id) % 100) / 100 - 0.5;
+    const length = 0.24 + ((i * 29 + neuron.id) % 80) / 400;
+    const tip = origin.clone().add(new THREE.Vector3(
+      Math.cos(angle) * length,
+      Math.sin(angle) * length * 0.72,
+      vertical * 0.36,
+    ));
+    const elbow = origin.clone().lerp(tip, 0.55).add(new THREE.Vector3(0.0, 0.04 * Math.sin(angle * 1.7), 0.05));
+    detailGroup.add(curveLine([origin, elbow, tip], dendriteMaterial));
+  }
+
+  const outgoing = (frame.synapses || []).filter((synapse) => synapse.source === neuron.id);
+  const targetSynapse = outgoing.find((synapse) => positionsById.has(synapse.target));
+  const axonTarget = targetSynapse
+    ? positionsById.get(targetSynapse.target).clone()
+    : origin.clone().add(new THREE.Vector3(0.48, 0.08, 0.05));
+  const axonMid = origin.clone().lerp(axonTarget, 0.52).add(new THREE.Vector3(0.0, 0.16, 0.12));
+  detailGroup.add(curveLine([origin, axonMid, axonTarget], axonMaterial));
+
+  for (const synapse of outgoing.slice(0, 8)) {
+    const target = positionsById.get(synapse.target);
+    if (!target) {
+      continue;
+    }
+    const terminal = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 8), terminalMaterial);
+    terminal.position.copy(target);
+    terminal.scale.setScalar(synapse.weight < 0 ? 0.85 : 1.1);
+    detailGroup.add(terminal);
+  }
+}
+
+function clearDetailGroup() {
+  for (const child of [...detailGroup.children]) {
+    child.geometry?.dispose?.();
+    detailGroup.remove(child);
+  }
+}
+
+function curveLine(points, material) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const positions = curve.getPoints(18).flatMap((point) => [point.x, point.y, point.z]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  return new THREE.Line(geometry, material);
 }
 
 function renderRegions(regions) {
@@ -218,6 +337,23 @@ function selectFrame(index) {
   }
   frameIndex = Math.max(0, Math.min(frames.length - 1, index));
   els.slider.value = String(frameIndex);
+  applyFrame(frames[frameIndex]);
+}
+
+function pickNeuron(event) {
+  if (!frames.length) {
+    return;
+  }
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+  raycaster.setFromCamera(pointer, camera);
+  const [hit] = raycaster.intersectObject(neuronsMesh);
+  if (!hit || hit.instanceId == null) {
+    return;
+  }
+  const neuron = frames[frameIndex].neurons[hit.instanceId];
+  selectedNeuronId = neuron?.id ?? null;
   applyFrame(frames[frameIndex]);
 }
 
@@ -274,6 +410,7 @@ els.playPause.addEventListener('click', () => {
 els.stepBack.addEventListener('click', () => selectFrame(frameIndex - 1));
 els.stepForward.addEventListener('click', () => selectFrame(frameIndex + 1));
 els.slider.addEventListener('input', () => selectFrame(Number(els.slider.value)));
+canvas.addEventListener('pointerdown', pickNeuron);
 
 loadSnapshotText(`
 ${sampleFrame(0, 0)}
