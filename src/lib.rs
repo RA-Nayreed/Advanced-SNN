@@ -5,6 +5,7 @@ pub mod gpu;
 pub mod graph;
 pub mod metrics;
 pub mod neuron;
+pub mod snapshot;
 pub mod types;
 
 #[cfg(feature = "mpi")]

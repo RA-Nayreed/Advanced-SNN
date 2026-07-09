@@ -16,6 +16,15 @@ pub struct ReferenceResult {
     pub active_spikes: Vec<NeuronId>,
 }
 
+pub struct StepTrace<'a> {
+    pub step: usize,
+    pub state: &'a NeuronState,
+    pub input_spikes: &'a [NeuronId],
+    pub output_spikes: &'a [NeuronId],
+    pub total_spikes: u64,
+    pub synapse_events_processed: u64,
+}
+
 pub fn run_reference(config: &SimulationConfig, graph: &CsrGraph) -> Result<ReferenceResult> {
     run_reference_with_initial_spikes(config, graph, &[])
 }
@@ -36,9 +45,40 @@ pub fn run_reference_with_initial_spikes(
 pub fn run_reference_from_state(
     config: &SimulationConfig,
     graph: &CsrGraph,
-    mut state: NeuronState,
+    state: NeuronState,
     initial_active_spikes: &[NeuronId],
 ) -> Result<ReferenceResult> {
+    run_reference_from_state_observed(config, graph, state, initial_active_spikes, |_| Ok(()))
+}
+
+pub fn run_reference_observed<F>(
+    config: &SimulationConfig,
+    graph: &CsrGraph,
+    initial_active_spikes: &[NeuronId],
+    observer: F,
+) -> Result<ReferenceResult>
+where
+    F: for<'a> FnMut(StepTrace<'a>) -> Result<()>,
+{
+    run_reference_from_state_observed(
+        config,
+        graph,
+        NeuronState::new(config.neurons),
+        initial_active_spikes,
+        observer,
+    )
+}
+
+fn run_reference_from_state_observed<F>(
+    config: &SimulationConfig,
+    graph: &CsrGraph,
+    mut state: NeuronState,
+    initial_active_spikes: &[NeuronId],
+    mut observer: F,
+) -> Result<ReferenceResult>
+where
+    F: for<'a> FnMut(StepTrace<'a>) -> Result<()>,
+{
     config.validate()?;
     graph.validate()?;
     state.validate_len(config.neurons)?;
@@ -97,6 +137,14 @@ pub fn run_reference_from_state(
 
         total_spikes += next_spikes.len() as u64;
         spikes_per_step.push(next_spikes.len());
+        observer(StepTrace {
+            step,
+            state: &state,
+            input_spikes: &active_spikes,
+            output_spikes: &next_spikes,
+            total_spikes,
+            synapse_events_processed,
+        })?;
         std::mem::swap(&mut active_spikes, &mut next_spikes);
     }
 

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
@@ -6,6 +8,7 @@ use crate::cpu::reference::run_reference;
 use crate::gpu;
 use crate::graph::random::generate_random_graph;
 use crate::neuron::lif::LifParams;
+use crate::snapshot::{run_reference_with_snapshots, SnapshotOptions};
 
 #[derive(Debug, Parser)]
 #[command(name = "advanced-snn")]
@@ -17,12 +20,20 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    Cpu(GraphArgs),
+    Cpu(CpuArgs),
     GpuDense(DenseArgs),
     GpuEvent(GraphArgs),
 
     #[cfg(feature = "mpi")]
     DistributedCpu(GraphArgs),
+}
+
+#[derive(Debug, Args)]
+struct CpuArgs {
+    #[command(flatten)]
+    graph: GraphArgs,
+    #[command(flatten)]
+    snapshot: SnapshotArgs,
 }
 
 #[derive(Debug, Args)]
@@ -53,6 +64,18 @@ struct DenseArgs {
     lif: LifArgs,
 }
 
+#[derive(Clone, Debug, Args)]
+struct SnapshotArgs {
+    #[arg(long)]
+    snapshot_out: Option<PathBuf>,
+    #[arg(long, default_value_t = 1)]
+    snapshot_every: usize,
+    #[arg(long, default_value_t = 1000)]
+    snapshot_neurons: usize,
+    #[arg(long, default_value_t = 2000)]
+    snapshot_synapses: usize,
+}
+
 #[derive(Clone, Copy, Debug, Args)]
 struct LifArgs {
     #[arg(long, default_value_t = 0.95)]
@@ -81,11 +104,15 @@ pub fn run() -> Result<()> {
     }
 }
 
-fn run_cpu(args: GraphArgs) -> Result<()> {
-    let config = args.to_simulation_config();
+fn run_cpu(args: CpuArgs) -> Result<()> {
+    let config = args.graph.to_simulation_config();
     config.validate()?;
     let graph = generate_random_graph(config.neurons, config.fanout, config.seed)?;
-    let result = run_reference(&config, &graph)?;
+    let result = if let Some(options) = args.snapshot.to_options() {
+        run_reference_with_snapshots(&config, &graph, options)?
+    } else {
+        run_reference(&config, &graph)?
+    };
     print!("{}", result.metrics);
     Ok(())
 }
@@ -139,6 +166,17 @@ impl DenseArgs {
             external_prob: self.lif.external_prob,
             external_current: self.lif.external_current,
         }
+    }
+}
+
+impl SnapshotArgs {
+    fn to_options(&self) -> Option<SnapshotOptions> {
+        self.snapshot_out.clone().map(|output| SnapshotOptions {
+            output,
+            every: self.snapshot_every,
+            neuron_sample: self.snapshot_neurons,
+            synapse_sample: self.snapshot_synapses,
+        })
     }
 }
 

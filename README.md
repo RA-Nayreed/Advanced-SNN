@@ -47,6 +47,15 @@ cargo run --release --features cuda -- gpu-event --neurons 100000 --fanout 64 --
 
 Script wrappers are available under `scripts/`.
 
+CPU snapshot export for visualization:
+
+```bash
+cargo run --release -- cpu --neurons 512 --fanout 16 --steps 100 --seed 1 \
+  --snapshot-out snapshots.ndjson --snapshot-every 1 --snapshot-neurons 512 --snapshot-synapses 2000
+```
+
+Snapshots are written as newline-delimited JSON. Each line contains sampled neuron positions, voltage, spike state, sampled synapses, and cumulative metrics for one timestep.
+
 ## Simulation Model
 
 Each neuron stores voltage, input current, and remaining refractory steps. On each timestep, the simulator clears input current, applies deterministic external input, processes outgoing synapses from active spikes, updates all neurons with the LIF rule, and swaps the active spike buffers.
