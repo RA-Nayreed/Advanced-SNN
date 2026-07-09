@@ -57,6 +57,20 @@ export OMP_PROC_BIND=spread
 export OPENBLAS_NUM_THREADS="${THREADS}"
 export MKL_NUM_THREADS="${THREADS}"
 
+mpi_build_available() {
+  if [[ -n "${MPI_PKG_CONFIG:-}" || -n "${CRAY_MPICH_DIR:-}" ]]; then
+    return 0
+  fi
+  if command -v mpicc >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v pkg-config >/dev/null 2>&1; then
+    pkg-config --exists mpich || pkg-config --exists ompi
+    return $?
+  fi
+  return 1
+}
+
 cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
 
 ./target/release/advanced-snn brain \
@@ -83,7 +97,7 @@ cargo build --release 2>&1 | tee "${OUT_DIR}/build_cpu.log"
   --snapshot-synapses 20000 \
   2>&1 | tee "${OUT_DIR}/brain_learning.log"
 
-if command -v mpirun >/dev/null 2>&1 || command -v srun >/dev/null 2>&1; then
+if mpi_build_available; then
   cargo build --release --features mpi 2>&1 | tee "${OUT_DIR}/build_mpi.log"
   if command -v srun >/dev/null 2>&1; then
     srun --ntasks=1 ./target/release/advanced-snn distributed-cpu \
@@ -101,7 +115,10 @@ if command -v mpirun >/dev/null 2>&1 || command -v srun >/dev/null 2>&1; then
       2>&1 | tee "${OUT_DIR}/distributed_probe.log"
   fi
 else
-  echo "MPI launcher not available in this allocation." | tee "${OUT_DIR}/distributed_probe.log"
+  {
+    echo "MPI build environment not available; distributed probe skipped."
+    echo "Set ROIHU_MODULES to include Roihu OpenMPI, or otherwise provide mpicc/MPI_PKG_CONFIG."
+  } | tee "${OUT_DIR}/distributed_probe.log"
 fi
 
 wc -l "${OUT_DIR}"/*.ndjson | tee "${OUT_DIR}/snapshot_line_counts.txt"
