@@ -16,3 +16,13 @@ cargo run --release -- brain --neurons 2000 --fanout 32 --steps 200 --seed 7 \
 ```
 
 Click a region row to toggle the offline stimulation overlay for that region. The gain slider controls the visual stimulation intensity during playback.
+
+## Live mode
+
+Run the local streaming backend from the repository root:
+
+```bash
+python3 tools/live_brain_server.py --port 5173
+```
+
+Open `http://127.0.0.1:5173` and press `LIVE`.

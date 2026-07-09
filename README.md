@@ -81,7 +81,15 @@ cd viewer
 python3 -m http.server 5173
 ```
 
-Then open `http://127.0.0.1:5173`. The viewer can also apply offline region stimulation overlays before live streaming is enabled.
+Then open `http://127.0.0.1:5173`. The viewer can also apply offline region stimulation overlays.
+
+Live local viewer backend:
+
+```bash
+python3 tools/live_brain_server.py --port 5173
+```
+
+Open `http://127.0.0.1:5173` and press `LIVE`.
 
 ## Simulation Model
 

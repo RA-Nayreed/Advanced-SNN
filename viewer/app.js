@@ -95,6 +95,7 @@ const terminalMaterial = new THREE.MeshStandardMaterial({
 const els = {
   file: document.querySelector('#snapshot-file'),
   loadSample: document.querySelector('#load-sample'),
+  connectLive: document.querySelector('#connect-live'),
   playPause: document.querySelector('#play-pause'),
   stepBack: document.querySelector('#step-back'),
   stepForward: document.querySelector('#step-forward'),
@@ -128,6 +129,7 @@ let positionsById = new Map();
 let regionsById = new Map();
 let selectedNeuronId = null;
 let stimulatedRegionId = null;
+let liveAbortController = null;
 const scratchMatrix = new THREE.Matrix4();
 const scratchColor = new THREE.Color();
 
@@ -140,6 +142,7 @@ function parseNdjson(text) {
 }
 
 async function loadSnapshotText(text, label) {
+  stopLiveStream();
   frames = parseNdjson(text);
   if (!frames.length) {
     throw new Error('snapshot has no frames');
@@ -153,6 +156,71 @@ async function loadSnapshotText(text, label) {
   els.status.textContent = label;
   buildStaticGeometry(frames[0]);
   applyFrame(frames[0]);
+}
+
+async function connectLiveStream() {
+  stopLiveStream();
+  liveAbortController = new AbortController();
+  frames = [];
+  frameIndex = 0;
+  playing = true;
+  els.playPause.textContent = 'Ⅱ';
+  els.frameCount.textContent = '0 frames';
+  els.status.textContent = 'connecting live.ndjson';
+
+  const response = await fetch('live.ndjson', { signal: liveAbortController.signal });
+  if (!response.ok) {
+    throw new Error(`live stream unavailable: ${response.status}`);
+  }
+  if (!response.body) {
+    await loadSnapshotText(await response.text(), 'live.ndjson');
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  els.status.textContent = 'live stream connected';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      appendLiveFrame(JSON.parse(trimmed));
+    }
+  }
+  if (buffer.trim()) {
+    appendLiveFrame(JSON.parse(buffer.trim()));
+  }
+  els.status.textContent = 'live stream ended';
+}
+
+function appendLiveFrame(frame) {
+  frames.push(frame);
+  els.slider.max = String(frames.length - 1);
+  els.frameCount.textContent = `${frames.length} frames`;
+  if (frames.length === 1) {
+    buildStaticGeometry(frame);
+  }
+  if (playing || frames.length === 1) {
+    selectFrame(frames.length - 1);
+  }
+}
+
+function stopLiveStream() {
+  if (liveAbortController) {
+    liveAbortController.abort();
+    liveAbortController = null;
+  }
 }
 
 function buildStaticGeometry(frame) {
@@ -422,6 +490,16 @@ els.loadSample.addEventListener('click', async () => {
     await loadSnapshotText(await response.text(), 'sample.ndjson');
   } catch (error) {
     els.status.textContent = error.message;
+  }
+});
+
+els.connectLive.addEventListener('click', async () => {
+  try {
+    await connectLiveStream();
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      els.status.textContent = error.message;
+    }
   }
 });
 
