@@ -1,0 +1,11 @@
+backend = "cpu"
+neurons = 1000
+fanout = 32
+steps = 100
+seed = 1
+decay = 0.95
+threshold = 1.0
+reset = 0.0
+refractory = 0
+external_prob = 0.001
+external_current = 1.2
